@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -38,7 +39,7 @@ type itemDelegate struct{}
 func main() {
 	data := url.Values{}
 	data.Set("sync_token", "*")
-	data.Set("resource_types", "[\"all\"]")
+	data.Set("resource_types", "[\"items\"]")
 
 	client := http.Client{}
 	request, err := http.NewRequest(
@@ -49,43 +50,48 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(todoistApiKey)
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", todoistApiKey))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	response, err := client.Do(request)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(response)
+	bodyJsonString, err := io.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var responseBody map[string]any
+	err = json.Unmarshal(bodyJsonString, &responseBody)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// items := []list.Item{
-	// 	item("Ramen"),
-	// 	item("Tomato Soup"),
-	// 	item("Hamburgers"),
-	// 	item("Cheeseburgers"),
-	// 	item("Currywurst"),
-	// 	item("Okonomiyaki"),
-	// 	item("Pasta"),
-	// 	item("Fillet Mignon"),
-	// 	item("Caviar"),
-	// 	item("Just Wine"),
-	// }
-	//
-	// const defaultWidth = 20
-	//
-	// ls := list.New(items, itemDelegate{}, defaultWidth, listHeight)
-	// ls.Title = "What do you want for dinner?"
-	// ls.SetShowStatusBar(false)
-	// ls.SetFilteringEnabled(false)
-	// ls.Styles.Title = titleStyle
-	// ls.Styles.PaginationStyle = paginationStyle
-	// ls.Styles.HelpStyle = helpStyle
-	//
-	// m := model{list: ls}
-	// p := tea.NewProgram(m, tea.WithAltScreen())
-	// if _, err := p.Run(); err != nil {
-	// 	log.Fatal(err)
-	// }
+	todoItems := responseBody["items"].([]any)
+	items := make([]list.Item, 0, len(todoItems))
+	for i := 0; i < len(todoItems); i++ {
+		todoItem := todoItems[i].(map[string]any)
+		itemContent, ok := todoItem["content"].(string)
+		if ok {
+			items = append(items, item(itemContent))
+		}
+	}
+
+	const defaultWidth = 20
+
+	ls := list.New(items, itemDelegate{}, defaultWidth, listHeight)
+	ls.Title = "todos"
+	ls.SetShowStatusBar(false)
+	ls.SetFilteringEnabled(false)
+	ls.Styles.Title = titleStyle
+	ls.Styles.PaginationStyle = paginationStyle
+	ls.Styles.HelpStyle = helpStyle
+
+	m := model{list: ls}
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (m model) Init() tea.Cmd {
