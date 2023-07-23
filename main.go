@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"net/url"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -19,6 +22,7 @@ var (
 	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170"))
 	paginationStyle   = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
 	helpStyle         = list.DefaultStyles().HelpStyle.PaddingLeft(4).PaddingBottom(1)
+	todoistApiKey     = os.Getenv("API_TOKEN")
 )
 
 type item string
@@ -32,34 +36,56 @@ func (i item) FilterValue() string { return "" }
 type itemDelegate struct{}
 
 func main() {
-	items := []list.Item{
-		item("Ramen"),
-		item("Tomato Soup"),
-		item("Hamburgers"),
-		item("Cheeseburgers"),
-		item("Currywurst"),
-		item("Okonomiyaki"),
-		item("Pasta"),
-		item("Fillet Mignon"),
-		item("Caviar"),
-		item("Just Wine"),
-	}
+	data := url.Values{}
+	data.Set("sync_token", "*")
+	data.Set("resource_types", "[\"all\"]")
 
-	const defaultWidth = 20
-
-	ls := list.New(items, itemDelegate{}, defaultWidth, listHeight)
-	ls.Title = "What do you want for dinner?"
-	ls.SetShowStatusBar(false)
-	ls.SetFilteringEnabled(false)
-	ls.Styles.Title = titleStyle
-	ls.Styles.PaginationStyle = paginationStyle
-	ls.Styles.HelpStyle = helpStyle
-
-	m := model{list: ls}
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	client := http.Client{}
+	request, err := http.NewRequest(
+		"POST",
+		"https://api.todoist.com/sync/v9/sync",
+		strings.NewReader(data.Encode()),
+	)
+	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println(todoistApiKey)
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", todoistApiKey))
+
+	response, err := client.Do(request)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(response)
+
+	// items := []list.Item{
+	// 	item("Ramen"),
+	// 	item("Tomato Soup"),
+	// 	item("Hamburgers"),
+	// 	item("Cheeseburgers"),
+	// 	item("Currywurst"),
+	// 	item("Okonomiyaki"),
+	// 	item("Pasta"),
+	// 	item("Fillet Mignon"),
+	// 	item("Caviar"),
+	// 	item("Just Wine"),
+	// }
+	//
+	// const defaultWidth = 20
+	//
+	// ls := list.New(items, itemDelegate{}, defaultWidth, listHeight)
+	// ls.Title = "What do you want for dinner?"
+	// ls.SetShowStatusBar(false)
+	// ls.SetFilteringEnabled(false)
+	// ls.Styles.Title = titleStyle
+	// ls.Styles.PaginationStyle = paginationStyle
+	// ls.Styles.HelpStyle = helpStyle
+	//
+	// m := model{list: ls}
+	// p := tea.NewProgram(m, tea.WithAltScreen())
+	// if _, err := p.Run(); err != nil {
+	// 	log.Fatal(err)
+	// }
 }
 
 func (m model) Init() tea.Cmd {
